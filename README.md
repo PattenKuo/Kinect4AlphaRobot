@@ -19,7 +19,10 @@
 * 解决Kinect排除多人数据捕捉干扰方法（未解决）
 
 ### 项目硬件模块
-![kinect2.0](https://github.com/sixcit/Kinect4AlphaRobot/blob/master/readme-img/220645of84nu2lf522f2fs.jpg)
+![bluemodel](https://raw.githubusercontent.com/sixcit/Kinect4AlphaRobot/master/readme-img/220645xhyws3tsjj3g5jw1.jpg)
+![kinect2.0](https://raw.githubusercontent.com/sixcit/Kinect4AlphaRobot/master/readme-img/220645of84nu2lf522f2fs.jpg)
+![alpha1s](https://raw.githubusercontent.com/sixcit/Kinect4AlphaRobot/master/readme-img/220646aisiujmhc7u2e3lc.jpg)
+
 
 * BLE蓝牙4.0串口模块
 * Kinect One 2.0（可同时记录6个人的20个关节点）
@@ -32,12 +35,13 @@
 * Visual Studio 2017（本项目使用C#）
 
 ### 实现原理思路
+![yuanli](https://raw.githubusercontent.com/sixcit/Kinect4AlphaRobot/master/readme-img/220646w805w0z9tnujzndj.png)
+
 * 利用Kinect获取人体骨骼关节点的三维空间坐标数据（）
 
 > Kinect技术可追踪20个骨骼关节点，骨骼数据包含20个关节点的X,Y,Z坐标信息，我们利用Kinect SDK 里的BodyBase案例里的深度图像处理技术进行二次开发，取相对应的14个节点数值
 
-
-
+![zuobiao](https://raw.githubusercontent.com/sixcit/Kinect4AlphaRobot/master/readme-img/220907drmmj6tgy6ygtr9g.png)
 （图片只画出左侧标注）
 
 *  头部(Head) –肩膀中心(ShoulderCenter)
@@ -56,6 +60,7 @@
 * 右手腕(Wrist Right)- 右手 (Hand Right)
 
 #### Kinect 人体感应示意图
+![yuanli](https://raw.githubusercontent.com/sixcit/Kinect4AlphaRobot/master/readme-img/220646vdm7sky2na3a3du3.jpg)
 
 面向感应器，X代表左右，Y代表上下，Z代表前后（距离在1.2~3.5m范围内，1.8米最适合）
 蓝牙通信协议开发标准（可上优必选官网下载，看懂文档是开发者的基本功就不多说了）
@@ -70,6 +75,8 @@
 
 
 #### 体感控制示意图（面向设备）
+
+![jishuan](https://raw.githubusercontent.com/sixcit/Kinect4AlphaRobot/master/readme-img/220646iz4fz300105fpf7s.jpg)
 
 设P状态下，取shoulder肩部点O（x0,y0,z0）,elbow肘部点P（x,y,z），Z轴值保持不变；
 
@@ -97,6 +104,8 @@ tan值的 + 与 –  区域正好可表达角度是大于90度还是小于90度�
 
 同样道理，当手向前水平合拢时，肩部关节点shoulder基本不变，通过X与Z轴求得手臂在肩部点前后转动的角度，方法与公式就不再详细说明。
 
-
+#### 勾搭我们
+* QQ：690683755 (非诚勿扰)
+* E-mail：cheman@6cit.com
 
 
