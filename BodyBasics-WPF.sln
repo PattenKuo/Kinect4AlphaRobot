@@ -34,172 +34,653 @@ namespace Microsoft.Samples.Kinect.BodyBasics
     using Microsoft.Kinect;
 
     /// <summary>
-    /// 在主窗口的交互逻辑
+    /// Interaction logic for MainWindow
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
     {
         /// <summary>
-        /// 手圈半径
+        /// Radius of drawn hand circles
         /// </summary>
         private const double HandSize = 30;
-        double qianhou = 0, zuoyou = 0, shangxia = 0;//原始数据
-        int qianhou_int = 0, zuoyou_int = 0, shangxia_int = 0;//转int后的数据
 
-        int[] buflb=new int[21];
-        int[] buflb2 = new int[61];
-        int[] buflb3 = new int[21];
-        int[] buflb4 = new int[21];
+        byte[] sendHexData = { 0xFB, 0XBF, 0X17, 0X23, 0X6A, 0X48, 0X59, 0X5A, 0X5B, 0X5A, 0X58, 0X3D, 0X4B, 0X6B, 0X5B, 0X58, 0X76, 0X68, 0X46, 0X5A, 0X23, 0X0a, 0XE4, 0XED };
 
-        float zuoyou_buf = 0;
-        float shangxia_buf = 0;
-        float qianhou_buf = 0;
-
-        float buf_2 = 0;
-        float buf_3 = 0;
-        float buf_4 = 0;
-        int i = 0, i2 = 0, i3 = 0;
-
-
-
-        int r = 0;//传感器检测不到手避免机械臂出现误动作
-
-        string qianhou_ascii="0", zuoyou_ascii="0", shangxia_ascii="0";//转string从串口发送出去
-        
-        int shou = 1; //手掌是张开还是握紧，0为握紧，1为张开或半张
-        int rx_ok = 1;//串口接收判断
-                      // float q1=0, h1=0,sx=0;
-        float shuju = 0;
-
-        int max = 0, min = 500;
+        float shoulder_r_x = 0, shoulder_r_y = 0,shoulder_r_z=0;
+        float shoulder_l_x = 0, shoulder_l_y = 0,shoulder_l_z=0;
+        float elbow_r_x = 0, elbow_r_y = 0,elbow_r_z=0;
+        float elbow_l_x = 0, elbow_l_y = 0, elbow_l_z=0;
+        float wrist_l_x = 0, wrist_l_y = 0;
+        float wrist_r_x = 0, wrist_r_y = 0;
+        float hip_r_y = 0;
+        float knee_r_y = 0;
+        float R1 = 0, R2 = 0, R3 = 0, R4 = 0, R5 = 0,R6=0,R7=0;
+        double r1 = 0,r2=0,r3=0,r4=0,r5=0,r6=0;
+        double a1 = 0, a2 = 0, a3 = 0, a4 = 0, a5 = 0,a6=0;
+        uint i1s = 0,i2s=0,i3s=0,i4s=0,i5s=0,i6s=0,i7s=0;
+        uint data = 0;
+       
+        /// <summary>
+        /// Thickness of drawn joint lines
+        /// </summary>
+        private const double JointThickness = 3;
 
         /// <summary>
-        /// 相机空间的夹紧z值为负值。
+        /// Thickness of clip edge rectangles
+        /// </summary>
+        private const double ClipBoundsThickness = 10;
+
+        /// <summary>
+        /// Constant for clamping Z values of camera space points from being negative
         /// </summary>
         private const float InferredZPositionClamp = 0.1f;
 
         /// <summary>
-        /// 用于绘制当前闭合的手的刷子。
+        /// Brush used for drawing hands that are currently tracked as closed
         /// </summary>
         private readonly Brush handClosedBrush = new SolidColorBrush(Color.FromArgb(128, 255, 0, 0));
 
         /// <summary>
-        /// 用于绘制当前被打开的手的刷子。
+        /// Brush used for drawing hands that are currently tracked as opened
         /// </summary>
         private readonly Brush handOpenBrush = new SolidColorBrush(Color.FromArgb(128, 0, 255, 0));
 
         /// <summary>
-        /// 用于绘制当前在套索（指针）位置上跟踪的手的刷子。
+        /// Brush used for drawing hands that are currently tracked as in lasso (pointer) position
         /// </summary>
         private readonly Brush handLassoBrush = new SolidColorBrush(Color.FromArgb(128, 0, 0, 255));
 
         /// <summary>
-        /// 用于绘制当前跟踪的接头的刷子。
+        /// Brush used for drawing joints that are currently tracked
         /// </summary>
         private readonly Brush trackedJointBrush = new SolidColorBrush(Color.FromArgb(255, 68, 192, 68));
 
         /// <summary>
-        /// 用于绘制当前推断的节理的刷子。
+        /// Brush used for drawing joints that are currently inferred
         /// </summary>        
         private readonly Brush inferredJointBrush = Brushes.Yellow;
 
         /// <summary>
-        /// 用于绘制目前推断出的骨骼的笔
+        /// Pen used for drawing bones that are currently inferred
         /// </summary>        
         private readonly Pen inferredBonePen = new Pen(Brushes.Gray, 1);
 
         /// <summary>
-        /// 体绘制输出绘图组
+        /// Drawing group for body rendering output
         /// </summary>
         private DrawingGroup drawingGroup;
 
         /// <summary>
-        /// 绘制将显示的图像
+        /// Drawing image that we will display
         /// </summary>
         private DrawingImage imageSource;
 
         /// <summary>
-        /// 活跃的Kinect传感器
+        /// Active Kinect sensor
         /// </summary>
         private KinectSensor kinectSensor = null;
 
         /// <summary>
-        /// 坐标映射器将一种点映射到另一种类型
+        /// Coordinate mapper to map one type of point to another
         /// </summary>
         private CoordinateMapper coordinateMapper = null;
 
         /// <summary>
-        /// 身体框架阅读器
+        /// Reader for body frames
         /// </summary>
         private BodyFrameReader bodyFrameReader = null;
 
         /// <summary>
-        /// 物体阵列
+        /// Array for the bodies
         /// </summary>
         private Body[] bodies = null;
 
+        /// <summary>
+        /// definition of bones
+        /// </summary>
+        private List<Tuple<JointType, JointType>> bones;
 
         /// <summary>
-        /// 显示宽度（深度空间）
+        /// Width of display (depth space)
         /// </summary>
         private int displayWidth;
 
         /// <summary>
-        /// 显示器高度（深度空间）
+        /// Height of display (depth space)
         /// </summary>
         private int displayHeight;
 
         /// <summary>
-        /// 流到显示状态文本
+        /// List of colors for each body tracked
+        /// </summary>
+        private List<Pen> bodyColors;
+
+        /// <summary>
+        /// Current status text to display
         /// </summary>
         private string statusText = null;
 
         /// <summary>
-        /// 初始化主窗口类的一个新实例。
+        /// Initializes a new instance of the MainWindow class.
         /// </summary>
         public MainWindow()
         {
-            
-            // 目前支持一个传感器。
+            // one sensor is currently supported
             this.kinectSensor = KinectSensor.GetDefault();
 
-            // 获取坐标映射器
+            // get the coordinate mapper
             this.coordinateMapper = this.kinectSensor.CoordinateMapper;
 
-            // 获取深度（显示）范围
+            // get the depth (display) extents
             FrameDescription frameDescription = this.kinectSensor.DepthFrameSource.FrameDescription;
 
-            // 获得关节空间大小
+            // get size of joint space
             this.displayWidth = frameDescription.Width;
             this.displayHeight = frameDescription.Height;
 
-            // 定义身体框架抓取器
+            // open the reader for the body frames
             this.bodyFrameReader = this.kinectSensor.BodyFrameSource.OpenReader();
 
-      
+            // a bone defined as a line between two joints
+            this.bones = new List<Tuple<JointType, JointType>>();
 
-            // 打开传感器
+            // Torso
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.Head, JointType.Neck));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.Neck, JointType.SpineShoulder));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.SpineShoulder, JointType.SpineMid));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.SpineMid, JointType.SpineBase));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.SpineShoulder, JointType.ShoulderRight));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.SpineShoulder, JointType.ShoulderLeft));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.SpineBase, JointType.HipRight));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.SpineBase, JointType.HipLeft));
+
+            // Right Arm
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.ShoulderRight, JointType.ElbowRight));
+
+            
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.ElbowRight, JointType.WristRight));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.WristRight, JointType.HandRight));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.HandRight, JointType.HandTipRight));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.WristRight, JointType.ThumbRight));
+
+            // Left Arm
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.ShoulderLeft, JointType.ElbowLeft));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.ElbowLeft, JointType.WristLeft));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.WristLeft, JointType.HandLeft));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.HandLeft, JointType.HandTipLeft));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.WristLeft, JointType.ThumbLeft));
+
+            // Right Leg
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.HipRight, JointType.KneeRight));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.KneeRight, JointType.AnkleRight));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.AnkleRight, JointType.FootRight));
+
+            // Left Leg
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.HipLeft, JointType.KneeLeft));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.KneeLeft, JointType.AnkleLeft));
+            this.bones.Add(new Tuple<JointType, JointType>(JointType.AnkleLeft, JointType.FootLeft));
+
+            // populate body colors, one for each BodyIndex
+            this.bodyColors = new List<Pen>();
+
+            this.bodyColors.Add(new Pen(Brushes.Red, 6));
+            this.bodyColors.Add(new Pen(Brushes.Orange, 6));
+            this.bodyColors.Add(new Pen(Brushes.Green, 6));
+            this.bodyColors.Add(new Pen(Brushes.Blue, 6));
+            this.bodyColors.Add(new Pen(Brushes.Indigo, 6));
+            this.bodyColors.Add(new Pen(Brushes.Violet, 6));
+
+            // set IsAvailableChanged event notifier
+            this.kinectSensor.IsAvailableChanged += this.Sensor_IsAvailableChanged;
+
+            // open the sensor
             this.kinectSensor.Open();
 
-            // 设置状态文本
+            // set the status text
             this.StatusText = this.kinectSensor.IsAvailable ? Properties.Resources.RunningStatusText
                                                             : Properties.Resources.NoSensorStatusText;
 
-            // 创建我们将用于绘图的绘图组
+            // Create the drawing group we'll use for drawing
             this.drawingGroup = new DrawingGroup();
 
-            // 创建一个可以在图像控制中使用的图像源
+            // Create an image source that we can use in our image control
             this.imageSource = new DrawingImage(this.drawingGroup);
 
-            //在这个简单的例子中使用窗口对象作为视图模型
+            // use the window object as the view model in this simple example
             this.DataContext = this;
 
-            //初始化窗口的组件（控件）
+            // initialize the components (controls) of the window
             this.InitializeComponent();
-            OpenSerialPort();
 
+            OpenSerialPort();
+            //btSend_Event();
         }
 
-        /********************************************************************************************************/
+        /// <summary>
+        /// INotifyPropertyChangedPropertyChanged event to allow window controls to bind to changeable data
+        /// </summary>
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        /// <summary>
+        /// Gets the bitmap to display
+        /// </summary>
+        public ImageSource ImageSource
+        {
+            get
+            {
+                return this.imageSource;
+            }
+        }
+
+        /// <summary>
+        /// Gets or sets the current status text to display
+        /// </summary>
+        public string StatusText
+        {
+            get
+            {
+                return this.statusText;
+            }
+
+            set
+            {
+                if (this.statusText != value)
+                {
+                    this.statusText = value;
+
+                    // notify any bound elements that the text has changed
+                    if (this.PropertyChanged != null)
+                    {
+                        this.PropertyChanged(this, new PropertyChangedEventArgs("StatusText"));
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Execute start up tasks
+        /// </summary>
+        /// <param name="sender">object sending the event</param>
+        /// <param name="e">event arguments</param>
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (this.bodyFrameReader != null)
+            {
+                this.bodyFrameReader.FrameArrived += this.Reader_FrameArrived;
+            }
+        }
+
+        /// <summary>
+        /// Execute shutdown tasks
+        /// </summary>
+        /// <param name="sender">object sending the event</param>
+        /// <param name="e">event arguments</param>
+        private void MainWindow_Closing(object sender, CancelEventArgs e)
+        {
+            if (this.bodyFrameReader != null)
+            {
+                // BodyFrameReader is IDisposable
+                this.bodyFrameReader.Dispose();
+                this.bodyFrameReader = null;
+            }
+
+            if (this.kinectSensor != null)
+            {
+                this.kinectSensor.Close();
+                this.kinectSensor = null;
+            }
+        }
+
+        /// <summary>
+        /// Handles the body frame data arriving from the sensor
+        /// </summary>
+        /// <param name="sender">object sending the event</param>
+        /// <param name="e">event arguments</param>
+        private void Reader_FrameArrived(object sender, BodyFrameArrivedEventArgs e)
+        {
+            bool dataReceived = false;
+
+            using (BodyFrame bodyFrame = e.FrameReference.AcquireFrame())
+            {
+                if (bodyFrame != null)
+                {
+                    if (this.bodies == null)
+                    {
+                        this.bodies = new Body[bodyFrame.BodyCount];
+                    }
+
+                    // The first time GetAndRefreshBodyData is called, Kinect will allocate each Body in the array.
+                    // As long as those body objects are not disposed and not set to null in the array,
+                    // those body objects will be re-used.
+                    bodyFrame.GetAndRefreshBodyData(this.bodies);
+                    dataReceived = true;
+                }
+            }
+
+            if (dataReceived)
+            {
+                using (DrawingContext dc = this.drawingGroup.Open())
+                {
+                    // Draw a transparent background to set the render size
+                    dc.DrawRectangle(Brushes.Black, null, new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
+
+                    int penIndex = 0;
+                    foreach (Body body in this.bodies)
+                    {
+                        Pen drawPen = this.bodyColors[penIndex++];
+
+                        if (body.IsTracked)
+                        {
+                            this.DrawClippedEdges(body, dc);
+
+                            IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
+                            Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+                            foreach (JointType jointType in joints.Keys)
+                            {
+                                CameraSpacePoint shoulder_right = joints[JointType.ShoulderRight].Position;
+                                CameraSpacePoint elbow_right = joints[JointType.ElbowRight].Position;
+                                CameraSpacePoint shoulder_left = joints[JointType.ShoulderLeft].Position;
+                                CameraSpacePoint elbow_left = joints[JointType.ElbowLeft].Position;
+                                CameraSpacePoint wrist_left = joints[JointType.WristLeft].Position;
+                                CameraSpacePoint wrist_right = joints[JointType.WristRight].Position;
+                                CameraSpacePoint hip_right = joints[JointType.HipRight].Position;
+                                CameraSpacePoint knee_right = joints[JointType.KneeRight].Position;
+                               
+                                DepthSpacePoint shoulder_right_xy = this.coordinateMapper.MapCameraPointToDepthSpace(shoulder_right);
+                                DepthSpacePoint elbow_right_xy = this.coordinateMapper.MapCameraPointToDepthSpace(elbow_right);
+                                DepthSpacePoint shoulder_left_xy = this.coordinateMapper.MapCameraPointToDepthSpace(shoulder_left);
+                                DepthSpacePoint elbow_left_xy = this.coordinateMapper.MapCameraPointToDepthSpace(elbow_left);
+                                DepthSpacePoint wrist_left_xy = this.coordinateMapper.MapCameraPointToDepthSpace(wrist_left);
+                                DepthSpacePoint wrist_right_xy = this.coordinateMapper.MapCameraPointToDepthSpace(wrist_right);
+
+                                DepthSpacePoint hip_right_xy = this.coordinateMapper.MapCameraPointToDepthSpace(hip_right);
+                                DepthSpacePoint knee_right_xy = this.coordinateMapper.MapCameraPointToDepthSpace(knee_right);
+
+                                shoulder_r_x = shoulder_right_xy.X;
+                                shoulder_r_y = shoulder_right_xy.Y;
+                                shoulder_r_z = shoulder_right.Z;
+                                elbow_r_x = elbow_right_xy.X;
+                                elbow_r_y = elbow_right_xy.Y;//2-6
+                                elbow_r_z = elbow_right.Z;
+                                shoulder_l_x = shoulder_left_xy.X;
+                                shoulder_l_y = shoulder_left_xy.Y;
+                                shoulder_l_z = shoulder_left.Z;
+                                elbow_l_x = elbow_left_xy.X;//4-5
+                                elbow_l_y = elbow_left_xy.Y;
+                                elbow_l_z = elbow_left.Z;
+                                wrist_l_x = wrist_left_xy.X;
+                                wrist_l_y = wrist_left_xy.Y;
+                                wrist_r_x = wrist_right_xy.X;
+                                wrist_r_y = wrist_right_xy.Y;
+
+                                hip_r_y = hip_right_xy.Y;
+                                knee_r_y = knee_right_xy.Y;
+
+                                R7 = hip_r_y-326 ;//站立蹲下
+                                if (R7 < 11) R7 = 0;
+                                i7s = (uint)R7;
+                                if (R7 < 3)
+                                {
+                                  //  TEXT1.Text = R7.ToString();
+                                    btSend(61, 11);btSend(75, 12);btSend(107, 13);//28   75  51
+                                    btSend(118, 16);btSend(104, 17);btSend(70, 18);//24  76  45 
+                                    data = 1;
+                                }
+                                if (R7 > 5)
+                                {
+                                //    TEXT1.Text = R7.ToString();
+                                    btSend(33, 11);btSend(0, 12);btSend(158, 13);//28   75  51
+                                    btSend(152, 16);btSend(180, 17);btSend(25, 18);//24  76  45 
+                                    btSend(85, 19);
+                                    data = 1;
+                                }
+
+                                if (shoulder_r_y <elbow_r_y)//1
+                                 {
+                                     R5 = (elbow_r_z - shoulder_r_z) / (shoulder_right.Y - elbow_right.Y);
+                                     r5 = System.Math.Atan(R5);
+                                     a5 = ((r5 / System.Math.PI * 180));
+                                     a5 = (int)a5;
+                                     a5 += 90;
+                                     a5 = 180 - a5;
+                                     i5s = (uint)a5;
+                                     btSend(i5s, 7);
+                                     data = 1;
+
+                                 }
+                                 if (shoulder_l_y < elbow_l_y)//4
+                                 {
+                                     R6 = (elbow_l_z - shoulder_l_z) / (shoulder_left.Y - elbow_left.Y);
+                                     r6 = System.Math.Atan(R6);
+                                     a6 = ((r6 / System.Math.PI * 180));
+                                     a6 = (int)a6;
+                                     a6 += 90;
+                                     //a6 = 180 - a6;
+                                     i6s = (uint)a6;
+                                     btSend(i6s, 4);
+                                     data = 1;
+                                 }
+                                
+                                 if (elbow_r_x >shoulder_r_x)//2
+                                 {
+                                     R1 = (elbow_r_x - shoulder_r_x)/ (elbow_r_y - shoulder_r_y);
+                                     r1 = System.Math.Atan(R1);
+                                    a1 = (r1 / System.Math.PI * 180);
+                                    if (a1 < 0) a1 = 90 + (90 + a1);
+                                    // a1 = 180-((r1 / System.Math.PI * 180) + 90);
+                                    //if (a1 > 179) a1 = 179;
+                                    a1 = 180 - a1;
+                                    if (a1 < 15) a1 = 0;
+                                    i1s = (uint)a1;
+                                     btSend(i1s, 8);
+                                     data = 1;
+                                 }
+                                 if(wrist_r_x> elbow_r_x)//3
+                                 {
+                                     R4 = (wrist_r_y-elbow_r_y) / (wrist_r_x-elbow_r_x);
+                                     r4 = System.Math.Atan(R4);
+                                     a4 = 180 - ((r4 / System.Math.PI * 180) + 90);
+                                     a4 += a1 - 90;
+                                     a4 = 180 - a4;
+                                     if (a4 > 179) a4 = 179;
+                                     if (a4 < 1) a4 = 1;
+                                     i4s = (uint)a4;
+                                     btSend(i4s, 9);
+                                     data = 1;
+                                 }
+                                 if (shoulder_l_x > elbow_l_x)//5
+                                 {
+                                     R2 =(elbow_l_x-shoulder_l_x)/ (elbow_l_y - shoulder_l_y);
+                                     r2 = System.Math.Atan(R2);
+                                     a2 = (r2 / System.Math.PI * 180);
+                                     if (a2 < 0) a2 = 90 + (90 + a2);
+                                    //a2 =180-((r2 / System.Math.PI * 180) + 90);
+                                    a2 = 180 - a2;
+                                     if (a2 > 173) a2 = 180;
+                                     //if (a2 < 1) a2 = 1;
+                                     i2s = (uint)a2;
+                                     btSend(i2s, 5);
+                                     data = 1;
+                                    TEXT1.Text =i1s.ToString() + "   " + i2s.ToString();
+                                }
+                                 if (elbow_l_x > wrist_l_x)//6
+                                 {
+                                     R3 = (elbow_l_y - wrist_l_y) / (elbow_l_x - wrist_l_x);
+                                     r3 = System.Math.Atan(R3);
+                                     a3 = 180 - ((r3 / System.Math.PI * 180) + 90);
+                                     a3 += a2 - 90;
+                                     a3 = 180 - a3;
+                                     if (a3 > 179) a3 = 179;
+                                     if (a3 < 1) a3 = 1;
+                                     i3s = (uint)a3;
+
+                                     btSend(i3s, 6);
+                                     data = 1;
+                                 }
+
+                                if (data == 1) { btSend_Event(); data = 0; }
+                                CameraSpacePoint g1 = joints[jointType].Position;
+                                DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(g1);
+                                jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+                            }
+                            this.DrawBody(joints, jointPoints, dc, drawPen);
+                            this.DrawHand(body.HandLeftState, jointPoints[JointType.HandLeft], dc);
+                            this.DrawHand(body.HandRightState, jointPoints[JointType.HandRight], dc);
+                        }
+                    }
+
+                    // prevent drawing outside of our render area
+                    this.drawingGroup.ClipGeometry = new RectangleGeometry(new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws a body
+        /// </summary>
+        /// <param name="joints">joints to draw</param>
+        /// <param name="jointPoints">translated positions of joints to draw</param>
+        /// <param name="drawingContext">drawing context to draw to</param>
+        /// <param name="drawingPen">specifies color to draw a specific body</param>
+        private void DrawBody(IReadOnlyDictionary<JointType, Joint> joints, IDictionary<JointType, Point> jointPoints, DrawingContext drawingContext, Pen drawingPen)
+        {
+            // Draw the bones
+            foreach (var bone in this.bones)
+            {
+                this.DrawBone(joints, jointPoints, bone.Item1, bone.Item2, drawingContext, drawingPen);
+            }
+
+            // Draw the joints
+            foreach (JointType jointType in joints.Keys)
+            {
+                Brush drawBrush = null;
+
+                TrackingState trackingState = joints[jointType].TrackingState;
+
+                if (trackingState == TrackingState.Tracked)
+                {
+                    drawBrush = this.trackedJointBrush;
+                }
+                else if (trackingState == TrackingState.Inferred)
+                {
+                    drawBrush = this.inferredJointBrush;
+                }
+
+                if (drawBrush != null)
+                {
+                    drawingContext.DrawEllipse(drawBrush, null, jointPoints[jointType], JointThickness, JointThickness);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws one bone of a body (joint to joint)
+        /// </summary>
+        /// <param name="joints">joints to draw</param>
+        /// <param name="jointPoints">translated positions of joints to draw</param>
+        /// <param name="jointType0">first joint of bone to draw</param>
+        /// <param name="jointType1">second joint of bone to draw</param>
+        /// <param name="drawingContext">drawing context to draw to</param>
+        /// /// <param name="drawingPen">specifies color to draw a specific bone</param>
+        private void DrawBone(IReadOnlyDictionary<JointType, Joint> joints, IDictionary<JointType, Point> jointPoints, JointType jointType0, JointType jointType1, DrawingContext drawingContext, Pen drawingPen)
+        {
+            Joint joint0 = joints[jointType0];
+            Joint joint1 = joints[jointType1];
+
+            // If we can't find either of these joints, exit
+            if (joint0.TrackingState == TrackingState.NotTracked ||
+                joint1.TrackingState == TrackingState.NotTracked)
+            {
+                return;
+            }
+
+            // We assume all drawn bones are inferred unless BOTH joints are tracked
+            Pen drawPen = this.inferredBonePen;
+            if ((joint0.TrackingState == TrackingState.Tracked) && (joint1.TrackingState == TrackingState.Tracked))
+            {
+                drawPen = drawingPen;
+            }
+
+            drawingContext.DrawLine(drawPen, jointPoints[jointType0], jointPoints[jointType1]);
+        }
+
+        /// <summary>
+        /// Draws a hand symbol if the hand is tracked: red circle = closed, green circle = opened; blue circle = lasso
+        /// </summary>
+        /// <param name="handState">state of the hand</param>
+        /// <param name="handPosition">position of the hand</param>
+        /// <param name="drawingContext">drawing context to draw to</param>
+        private void DrawHand(HandState handState, Point handPosition, DrawingContext drawingContext)
+        {
+            switch (handState)
+            {
+                case HandState.Closed:
+                    drawingContext.DrawEllipse(this.handClosedBrush, null, handPosition, HandSize, HandSize);
+                    break;
+
+                case HandState.Open:
+                    drawingContext.DrawEllipse(this.handOpenBrush, null, handPosition, HandSize, HandSize);
+                    break;
+
+                case HandState.Lasso:
+                    drawingContext.DrawEllipse(this.handLassoBrush, null, handPosition, HandSize, HandSize);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Draws indicators to show which edges are clipping body data
+        /// </summary>
+        /// <param name="body">body to draw clipping information for</param>
+        /// <param name="drawingContext">drawing context to draw to</param>
+        private void DrawClippedEdges(Body body, DrawingContext drawingContext)
+        {
+            FrameEdges clippedEdges = body.ClippedEdges;
+
+            if (clippedEdges.HasFlag(FrameEdges.Bottom))
+            {
+                drawingContext.DrawRectangle(
+                    Brushes.Red,
+                    null,
+                    new Rect(0, this.displayHeight - ClipBoundsThickness, this.displayWidth, ClipBoundsThickness));
+            }
+
+            if (clippedEdges.HasFlag(FrameEdges.Top))
+            {
+                drawingContext.DrawRectangle(
+                    Brushes.Red,
+                    null,
+                    new Rect(0, 0, this.displayWidth, ClipBoundsThickness));
+            }
+
+            if (clippedEdges.HasFlag(FrameEdges.Left))
+            {
+                drawingContext.DrawRectangle(
+                    Brushes.Red,
+                    null,
+                    new Rect(0, 0, ClipBoundsThickness, this.displayHeight));
+            }
+
+            if (clippedEdges.HasFlag(FrameEdges.Right))
+            {
+                drawingContext.DrawRectangle(
+                    Brushes.Red,
+                    null,
+                    new Rect(this.displayWidth - ClipBoundsThickness, 0, ClipBoundsThickness, this.displayHeight));
+            }
+        }
+
+        /// <summary>
+        /// Handles the event which the sensor becomes unavailable (E.g. paused, closed, unplugged).
+        /// </summary>
+        /// <param name="sender">object sending the event</param>
+        /// <param name="e">event arguments</param>
+        private void Sensor_IsAvailableChanged(object sender, IsAvailableChangedEventArgs e)
+        {
+            // on failure, set the status text
+            this.StatusText = this.kinectSensor.IsAvailable ? Properties.Resources.RunningStatusText
+                                                            : Properties.Resources.SensorNotAvailableStatusText;
+        }
+       
         delegate void HanderInterfaceUpdataDelegate(string mySendData);
         HanderInterfaceUpdataDelegate myUpdataHander;
         delegate void txtGotoEndDelegate();
@@ -208,20 +689,6 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         string[] portsName = SerialPort.GetPortNames();
         //串口关闭标志
         bool serialportIsClosing;
-        /// <summary>
-        /// inotifypropertychangedpropertychanged事件让窗口控件绑定到可变数据
-        /// </summary>
-        public event PropertyChangedEventHandler PropertyChanged;
-        private void Window_Loaded(object sender, RoutedEventArgs e)
-        {
-            
-
-            OpenSerialPort();
-
-           // LoadDataGrid();
-
-            //dg.ItemsSource = dt.DefaultView;
-        }
         private void OpenSerialPort()
         {
             if (mySerialPort.IsOpen)
@@ -233,20 +700,25 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                 if (portsName.Length > 0)
                 {
                     Array.Sort(portsName);
-                    mySerialPort.PortName = portsName[0];
+                    mySerialPort.PortName = "COM3";
                     mySerialPort.DataBits = 8;
-                    mySerialPort.BaudRate = 115200;
+                    mySerialPort.BaudRate = 38400;
                     mySerialPort.Parity = Parity.None;
                     mySerialPort.StopBits = StopBits.One;
                     try
                     {
                         mySerialPort.Open();
                     }
+
                     catch
                     {
                         MessageBox.Show("串口被占用！");
                         return;
                     }
+                }
+                else
+                {
+                    MessageBox.Show("没有找到串口");
                 }
             }
         }
@@ -267,342 +739,37 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                 MessageBox.Show("串口已关闭");
             }
         }
-        //串口接收函数
-        private void mySerialPort_DataReceived(object sender, SerialDataReceivedEventArgs e)
+        private void btSend(uint i3,uint i4)
         {
-            //如果串口正在关闭，返回
-            if (serialportIsClosing == true)
-            {
-                return;
-            }
-            int n = mySerialPort.BytesToRead;
-            byte[] buf = new byte[n];
-            mySerialPort.Read(buf, 0, n);
-            myUpdataHander = new HanderInterfaceUpdataDelegate(getData);
-            string abc;
-            //abc为接收到的16进制字符串
-            abc = System.Text.Encoding.Default.GetString(buf);
-            if (abc == "$0 OK")
-            {
-                rx_ok = 1;
-            }
-            Dispatcher.Invoke(myUpdataHander, abc);
-        }
-        private void getData(string sendData)
-        {
-           // MessageBox.Show(sendData);
-        }
-    
-
-        private void btSend_Event(string strSend)//发送数据
-        {
-           
-                if (rx_ok == 1)
-                {
-                    if (mySerialPort.IsOpen)
-                    {
-                        byte[] sendHexData = Encoding.ASCII.GetBytes(strSend);
-
-                        mySerialPort.Write(sendHexData, 0, sendHexData.Length);
-                        r = 0;
-                    }
-                    else
-                    {
-                        MessageBox.Show("串口没有打开，请检查！");
-                    }
-                }
-        }
-        private void btSend_Click(object sender, RoutedEventArgs e)//发送按钮
-        {
-            btSend_Event("#n M231 V1\n");//发送按钮
-            MessageBox.Show("触发");
-        }
-
-        /************************************************************************************************************************************************/
-        /// <summary>
-        /// 获取要显示的位图。
-        /// </summary>
-        public ImageSource ImageSource
-        {
-            get
-            {
-                return this.imageSource;
-            }
-        }
-
-        /// <summary>
-        /// 获取或设置要显示的当前状态文本。
-        /// </summary>
-        public string StatusText
-        {
-            get
-            {
-                return this.statusText;
-            }
-
-            set
-            {
-                if (this.statusText != value)
-                {
-                    this.statusText = value;
-
-                    // 通知文本已更改的任何绑定元素。
-                    if (this.PropertyChanged != null)
-                    {
-                        this.PropertyChanged(this, new PropertyChangedEventArgs("StatusText"));
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// 执行启动任务
-        /// </summary>
-        /// <param name="sender">发送事件的对象</param>
-        /// <param name="e">事件参数</param>
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
-        {
-            if (this.bodyFrameReader != null)
-            {
-                this.bodyFrameReader.FrameArrived += this.Reader_FrameArrived;
-            }
-        }
-
-        /// <summary>
-        /// 执行关机任务
-        /// </summary>
-        /// <param name="sender">发送事件的对象</param>
-        /// <param name="e">事件参数</param>
-        private void MainWindow_Closing(object sender, CancelEventArgs e)
-        {
-            if (this.bodyFrameReader != null)
-            {
-                // BodyFrameReader是IDisposable
-                this.bodyFrameReader.Dispose();
-                this.bodyFrameReader = null;
-            }
-
-            if (this.kinectSensor != null)
-            {
-                this.kinectSensor.Close();
-                this.kinectSensor = null;
-            }
-        }
-
-        /// <summary>
-        /// 处理从传感器到达的身体帧数据。
-        /// </summary>
-        /// <param name="sender">发送事件的对象</param>
-        /// <param name="e">事件参数</param>
-        private void Reader_FrameArrived(object sender, BodyFrameArrivedEventArgs e)
-        {
-            bool dataReceived = false;
             
-            using (BodyFrame bodyFrame = e.FrameReference.AcquireFrame())
+            byte[] B = { 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0X0B, 0X0C, 0X0D, 0X0E, 0X0F };
+            byte sdata = 0;
+            int s = 0, s2 = 0;
+            sdata = B[(i3 >> 4) & 0x0f];
+            sdata <<= 4;
+            sdata |= B[(i3 & 0x0f)];
+            sendHexData[i4] = sdata;
+            s2 = 0;
+            for (s = 2; s < 22; s++)
             {
-                if (bodyFrame != null)
-                {
-                    if (this.bodies == null)
-                    {
-                      
-                        this.bodies = new Body[bodyFrame.BodyCount];
-                    }
-
-                    // MessageBox.Show(position.ToString());
-                    //第一次getandrefreshbodydata称，Kinect将数组中的每个体分配。
-                    //只要这些体对象没有被处理，数组中没有设置为null，
-                    //这些物体将被重新使用。0
-                    //MessageBox.Show(bodyFrame.BodyCount.ToString());
-                    bodyFrame.GetAndRefreshBodyData(this.bodies);
-                    if (bodyFrame.BodyCount <= 6) dataReceived = true; else dataReceived = false;
-                    //
-                }
-                
+                s2 += sendHexData[s];
             }
-
-            if (dataReceived)
-            {
-                using (DrawingContext dc = this.drawingGroup.Open())
-                {
-                    //绘制透明背景以设置渲染大小。
-                    dc.DrawRectangle(Brushes.Black, null, new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
-
-                    foreach (Body body in this.bodies)
-                    {
-                     
-
-                        if (body.IsTracked)
-                        {
-
-                            IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
-
-                            // 将关节点转换为深度（显示）空间
-                            Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
-
-                            foreach (JointType jointType in joints.Keys)
-                            {
-                                //有时推断出的关节深度（z）可能表现为阴性。
-                                // 夹到0.1F至防止coordinatemapper返回（∞，∞）
-                                CameraSpacePoint position = joints[jointType].Position;
-                                if (position.Z < 0)
-                                {
-                                    position.Z = InferredZPositionClamp;
-                                }
-                                qianhou = position.Z;//获取Z轴作为前后移动
-                                DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
-                                jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
-                                shangxia = depthSpacePoint.Y;//获取Y轴数据左右上下移动
-
-                                zuoyou = depthSpacePoint.X;//获取X轴数据作为左右移动
-                              
-
-
-                            }
-                            if (r == 1)//捕捉到手证明数据有效，进行计算发送到机械手上
-                            {
-                                qianhou_int = (int)(qianhou * 100);//Z轴数据放大100倍
-                                zuoyou_int = (int)zuoyou;//强制转换为int类型
-                                shangxia_int = (int)shangxia;//强制转换为int类型
-
-    /*********************************************************前后数据计算********************************************************************/
-
-                                if (qianhou_int < 110) qianhou_int = 110;//软件界面手的捕获范围的最小值
-                                if (qianhou_int > 180) qianhou_int = 180;//软件界面手的捕获范围的最大值
-                                qianhou_int -= 90;//前后最小值是30，所以要减去90
-                                qianhou_int += (int)((double)qianhou_int * 0.8);//运动轨迹放大
-
-                                buf_2 = 0;//滤波结果清空
-
-                                buflb[i++] = qianhou_int;//将最新值放入数组中
-                                for (i = 0; i < 20; i++)//将数组中的元素全部向前移动一位，将最新值放到最尾
-                                {
-                                    buflb[i] = buflb[i + 1];
-                                    buf_2 += buflb[i];//将所有值做一个平均计算
-                                }
-                                buf_2 /= 20;
-                                if (qianhou_buf < buf_2) if ((buf_2 - qianhou_buf) >= 2) qianhou_buf += 2;
-                                if (qianhou_buf > buf_2) if ((qianhou_buf - buf_2) >= 2) qianhou_buf -= 2;
-                               
-                                qianhou_ascii =qianhou_buf.ToString();//将结果转换成字符串数据
-
-/*********************************************************左右数据计算***************************************************************************/
-
-
-                                if (zuoyou_int <= 200) zuoyou_int = 200;
-                                if (zuoyou_int >= 380) zuoyou_int = 380;
-                                zuoyou_int -= 200;
-
-                                //zuoyou_int= (int)((double)(zuoyou_int * 0.69));
-
-                                buf_3 = 0;
-                                buflb2[i2++] = zuoyou_int;
-                                for (i2 = 0; i2 < 20; i2++)
-                                {
-                                    buflb2[i2] = buflb2[i2 + 1];
-                                    buf_3 += buflb2[i2];
-                                }
-                                buf_3 /= 20;
-                                if (buf_3 > 180) buf_3 = 180;
-                                buf_3 = 180 - buf_3;
-                                buf_3 = (int)buf_3;
-                                
-                                if (zuoyou_buf > buf_3)if((zuoyou_buf-buf_3)>=2) zuoyou_buf-=2;
-                                if (zuoyou_buf < buf_3)if((buf_3-zuoyou_buf)>=2) zuoyou_buf+=2;
-                                zuoyou_buf = (int)zuoyou_buf;
-                                zuoyou_ascii = zuoyou_buf.ToString();
-
-/****************************************************上下数据计算********************************************************************************/
-
-                                if (shangxia_int <= 140) shangxia_int = 140;//软件捕获范围
-                                if (shangxia_int >= 220) shangxia_int = 220;
-                                shangxia_int -= 110;//上下数值最低是30，所以减去100
-                                buf_4 = 0;//滤波值清空
-                                buflb3[i3++] = shangxia_int;//存入最新值
-                                for (i3 = 0; i3 < 20; i3++)
-                                {
-                                    buflb3[i3] = buflb3[i3 + 1];
-                                    buf_4 += buflb3[i3];//求和
-                                } 
-                                buf_4 /= 20;//求平均
-
-                                if (shangxia_buf < buf_4) if ((buf_4 - shangxia_buf) >= 2) shangxia_buf += 2;
-                                if (shangxia_buf > buf_4) if ((shangxia_buf - buf_4) >= 2) shangxia_buf -= 2;
-                                shangxia_ascii = shangxia_buf.ToString();//将结果转换为字符串数据
-                               
-                                
-                                if ( buf_4 > 0)
-                                {
-                                    //防止吸头低于水平位置，经过数学统计后得出M1\M2坐标斜率比为大于0.53小于3.5
-                                    if ((buf_2 / buf_4) >= 0.53&& (buf_2 / buf_4) <= 3.5)
-                                    {
-                                        
-                                        btSend_Event("#n G202 N1 V");
-                                        btSend_Event(qianhou_ascii);
-                                        btSend_Event("\n");
-                                        btSend_Event("#n G202 N2 V");
-                                        btSend_Event(shangxia_ascii);
-                                        btSend_Event("\n");
-                                        btSend_Event("#n G202 N0 V");
-                                        btSend_Event(zuoyou_ascii);
-                                        btSend_Event("\n");
-
-
-                                        shuju = buf_2 / buf_4;
-                                    
-                                    //rxtext.Text = shuju.ToString()+"   "+zuoyou_ascii/*+"     "+shangxia_ascii+"        "+buf_2.ToString()+"    "+buf_4.ToString()*/;
-                               
-                                   }
-                                }
-                                    
-                                    
-                                   if (shou == 0) btSend_Event("#n M231 V1\n"); //手握紧
-                                   if (shou == 1) btSend_Event("#n M231 V0\n");//手张开或半开
-                                   r = 0;
-                            }
-         
-                            this.DrawHand(body.HandLeftState, jointPoints[JointType.HandLeft], dc);
-                            this.DrawHand(body.HandRightState, jointPoints[JointType.HandRight], dc);
-                            
-                        }
-                    }
-
-                    // 防止在我们的渲染区域之外绘制
-                    this.drawingGroup.ClipGeometry = new RectangleGeometry(new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
-                }
-            }     
+            sdata = B[(s2 >> 4) & 0x0f];
+            sdata <<= 4;
+            sdata |= B[(s2 & 0x0f)];
+            sendHexData[22] = sdata;
+            
         }
-
-        /// <summary>
-        /// 如果手被跟踪，画一个手符号：红色圆圈=封闭，绿色圆圈=打开；蓝色圆圈=套索
-        /// </summary>
-        /// <param name="handState">state of the hand</param>
-        /// <param name="handPosition">position of the hand</param>
-        /// <param name="drawingContext">drawing context to draw to</param>
-        private void DrawHand(HandState handState, Point handPosition, DrawingContext drawingContext)
+        private void btSend_Event()
         {
-
-            switch (handState)
+            if (mySerialPort.IsOpen)
             {
-                case HandState.Closed:
-                    drawingContext.DrawEllipse(this.handClosedBrush, null, handPosition, qianhou*20, qianhou * 20);
-                    shou = 0;//手放开闭合状态保存
-                    r = 1;//捕捉到手
-                    break;
-
-                case HandState.Open:
-                    drawingContext.DrawEllipse(this.handOpenBrush, null, handPosition, qianhou * 20, qianhou * 20);
-                    shou = 1;//手放开闭合状态保存
-                    r = 1;//捕捉到手
-                    break;
-
-                case HandState.Lasso:
-                    drawingContext.DrawEllipse(this.handLassoBrush, null, handPosition, qianhou * 20, qianhou * 20);
-                    shou = 1;//手放开闭合状态保存
-                    r = 0;//捕捉到手
-                    break;
+                mySerialPort.Write(sendHexData, 0, sendHexData.Length);
+            }
+            else
+            {
+                MessageBox.Show("串口没有打开，请检查！");
             }
         }
-
-     
     }
 }
